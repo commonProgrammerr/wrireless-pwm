@@ -1,0 +1,60 @@
+.content-container {
+  display: flex;
+  flex-direction: column;
+  background-color: white;
+  padding: 1.25rem;
+  min-width: 360px;
+  width: 45vw;
+  min-height: 50vh;
+  border-radius: 16px;
+  gap: 32px;
+}
+.content-container > fieldset {
+  display: flex;
+  flex-direction: column;
+  border: none;
+}
+
+#value {
+  color: #0101016c;
+  font-weight: 600;
+}
+
+h1,
+h2,
+h3,
+h4,
+h5 {
+  align-self: center;
+  color: #000a;
+  margin-bottom: 1.24rem;
+}
+
+@media screen and (min-width: 420px) {
+  body {
+    align-items: center;
+    justify-content: center;
+  }
+}
+
+@media screen and (max-width: 420px) {
+  .content-container {
+    flex: 1;
+    align-self: stretch;
+    width: 100%;
+    min-height: 100vh;
+    border-radius: 0;
+  }
+}
+
+.apply-bt {
+  text-align: center;
+  padding: 8px;
+  border-radius: 12px;
+
+  background-color: #00f;
+  color: white;
+
+  font-size: 1.125rem;
+  font-weight: 600;
+}
