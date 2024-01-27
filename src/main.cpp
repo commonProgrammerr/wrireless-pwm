@@ -129,7 +129,7 @@ void handleUpdate(AsyncWebServerRequest *request)
   config.enable = body["enable"];
   config.frequency = body["frequency"];
   config.pin = body["pin"];
-  config.duty = body["duty"];
+  config.duty = static_cast<int>(body["duty"].as<double>() * 8192);
 
   PWM.setup(config);
   PWM.apply(config);
