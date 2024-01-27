@@ -22,6 +22,7 @@
 #define RGB_PINK 255, 0, 132
 
 Freenove_ESP32_WS2812 RGB = Freenove_ESP32_WS2812(LEDS_COUNT, LEDS_PIN, CHANNEL, TYPE_GRB);
+PWMController PWM = PWMController();
 
 #define SETUP_RGB(Brightness) \
   RGB.begin();                \
@@ -33,19 +34,15 @@ Freenove_ESP32_WS2812 RGB = Freenove_ESP32_WS2812(LEDS_COUNT, LEDS_PIN, CHANNEL,
   RGB.show();                    \
   delayMicroseconds(300)
 
-// Freenove_ESP32_WS2812 RGB = Freenove_ESP32_WS2812(1, 18, 0, TYPE_GRB);
+void handleBody(AsyncWebServerRequest *request, uint8_t *data, size_t len, size_t index, size_t total);
 
 AsyncWebServer server(80);
 
-pwm_config PWMOutPuts[2] = {
-    {.enable = false,
-     .pin = 1,
-     .frequency = 0,
-     .value = 0},
-    {.enable = false,
-     .pin = 1,
-     .frequency = 0,
-     .value = 0},
+pwm_config config = {
+    .enable = false,
+    .pin = 1,
+    .frequency = 0,
+    .duty = 0,
 };
 
 void handleUpdate(AsyncWebServerRequest *request);
@@ -66,10 +63,11 @@ void setup()
 
   RGB_COLOR(RGB_GREEN);
 
-  AsyncStaticWebHandler *static_handler = new AsyncStaticWebHandler("/", SPIFFS, "/", NULL);
-  static_handler->setDefaultFile("index.html");
-  server.addHandler(static_handler);
-  server.on("/update-speed", HTTP_POST, handleUpdate);
+  server.serveStatic("/", SPIFFS, "/", NULL)
+      .setDefaultFile("index.html");
+  server.on("/update-pwm", HTTP_POST, handleUpdate)
+      .onBody(handleBody);
+
   server.begin();
 
   analogWriteResolution(14);
@@ -104,25 +102,52 @@ JsonObject getParamsObj(AsyncWebServerRequest *request)
 
 void handleUpdate(AsyncWebServerRequest *request)
 {
-  // if (!request->hasParam("index"))
-  // {
-  //   request->send(400, "text/plain", "Invalid request");
-  //   return;
-  // }
+  if (request->client()->disconnected())
+  {
+    Serial.println("Client disconnected");
+    return;
+  }
 
-  JsonObject params = getParamsObj(request);
-  Serial.println("Received params:");
-  serializeJson(params, Serial);
+  if (request->contentType() != "application/json")
+    request->send(400);
 
-  int index = params["index"].as<String>().toInt();
+  Serial.print("New request on ");
+  Serial.println(request->url());
 
-  PWMOutPuts[index].pin = params["pin"].as<int>();
-  PWMOutPuts[index].enable = params["enable"] == "true";
-  PWMOutPuts[index].frequency = params["frequency"].as<String>().toInt();
-  PWMOutPuts[index].value = params["value"].as<String>().toInt();
+  File body_file = SPIFFS.open(request->url() + "/body.json");
+  if (!body_file)
+  {
+    Serial.println("Fail to open body file");
+    return request->send(500);
+  }
 
-  // String frequency = params["frequency"];
-  // String value = params["value"];
+  auto stream = request->beginResponseStream("application/json");
 
-  request->send(200, "text/plain", "");
+  JsonDocument body;
+  deserializeJson(body, body_file);
+
+  config.enable = body["enable"];
+  config.frequency = body["frequency"];
+  config.pin = body["pin"];
+  config.duty = body["duty"];
+
+  PWM.setup(config);
+  PWM.apply(config);
+  PWM.save("/output.config", &config);
+  request->send(200);
+}
+
+void handleBody(AsyncWebServerRequest *request, uint8_t *data, size_t len, size_t index, size_t total)
+{
+
+  File body_file = SPIFFS.open(request->url() + "/body.json", index ? "a" : "w", true);
+
+  if (!body_file)
+  {
+    Serial.println("Fail to open body file");
+    request->send(500);
+    return delay(10);
+  }
+
+  body_file.write(data, len);
 }

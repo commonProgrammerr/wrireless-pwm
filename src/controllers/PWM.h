@@ -10,11 +10,12 @@ typedef struct
   bool enable;
   uint8_t pin;
   uint32_t frequency;
-  int value;
+  int duty;
 } pwm_config;
 
 struct PWMController : ConfigController<pwm_config>
 {
+  PWMController(){};
   bool load(const char *path, pwm_config *data)
   {
     File config_file = SPIFFS.open(path);
@@ -34,7 +35,7 @@ struct PWMController : ConfigController<pwm_config>
 
     int8_t channel = analogGetChannel(data.pin);
 
-    log_v("GPIO %d - Using Channel %d, Value = %d", data.pin, channel, data.value);
+    log_v("GPIO %d - Using Channel %d, Value = %d", data.pin, channel, data.duty);
     if (ledcSetup(channel, data.frequency, 14U) == 0)
     {
       log_e("analogWrite setup failed (freq = %u, resolution = %u). Try setting different resolution or frequency");
@@ -43,7 +44,7 @@ struct PWMController : ConfigController<pwm_config>
     ledcAttachPin(data.pin, channel);
 
     if (data.enable)
-      ledcWrite(channel, data.value);
+      ledcWrite(channel, data.duty);
     else
       ledcWrite(channel, 0U);
   }
@@ -53,4 +54,5 @@ struct PWMController : ConfigController<pwm_config>
     pinMode(data.pin, OUTPUT);
   }
 };
+
 #endif

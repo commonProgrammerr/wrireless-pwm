@@ -1,16 +1,17 @@
 import { ChangeEventHandler, useCallback, useState } from "react";
 import "./App.css";
 import { Toggle } from "./components/toggle";
+import { WaveGraph } from "./components/wave";
 
 function App() {
-  const [value, setValue] = useState(50);
+  const [duty, setDuty] = useState(50);
   const [hz, setHz] = useState(1);
   const [enable, setEnable] = useState(true);
 
-  const handleChange = useCallback<ChangeEventHandler<HTMLInputElement>>(
+  const handleChangeDuty = useCallback<ChangeEventHandler<HTMLInputElement>>(
     (ev) => {
       ev.preventDefault();
-      enable && setValue(Number(ev.target.value));
+      enable && setDuty(Number(ev.target.value));
     },
     [enable]
   );
@@ -23,7 +24,6 @@ function App() {
   );
 
   function getFrequency() {
-    // if (hz < 1e-6) return hz;
     if (hz < 1)
       return (
         (hz * 1e3).toLocaleString(undefined, {
@@ -40,49 +40,24 @@ function App() {
     );
   }
 
-  function getPath() {
-    const path = [];
-    const factor = Math.round(hz < 1 ? 1 : hz) * 4;
-    const total_width = 985;
-    const wave_width = total_width / (factor * 2);
-    const duty = value / 100;
-
-    for (let i = 0; i < factor; i++) {
-      path.push(
-        `h${duty * wave_width}v${30}h${wave_width - duty * wave_width}V10`
-      );
-    }
-    return `m5,${40}V10${path.reduce((p, c) => p + c)}`;
-  }
-
   return (
     <div className="content-container">
       <h3>Wriless-pwm controll</h3>
-      <svg
-        className="wave-content"
-        viewBox="0 0 500 60"
-        height={80}
-        fill="none"
-      >
-        <path
-          stroke={enable ? "#00F" : "#00000096"}
-          strokeWidth="2"
-          strokeLinejoin="round"
-          strokeLinecap="round"
-          d={getPath()}
-        />
-      </svg>
-      <Toggle checked={enable} onCheckedChange={setEnable} />
+      <WaveGraph disabled={!enable} frequency={hz} duty_clicle={duty} />
+      <fieldset>
+        <label style={{ marginBottom: 3 }}>Enable</label>
+        <Toggle checked={enable} onCheckedChange={setEnable} />
+      </fieldset>
       <fieldset>
         <label>
-          Duty clicle <span id="value1">{value}%</span>
+          Duty clicle <span>{duty}%</span>
         </label>
         <input
           type="range"
-          name="speed"
+          name="duty"
           disabled={!enable}
-          value={value}
-          onChange={handleChange}
+          value={duty}
+          onChange={handleChangeDuty}
           min="0"
           step="0.1"
           max="100"
@@ -94,7 +69,7 @@ function App() {
         </label>
         <input
           type="range"
-          name="speed"
+          name="frequency"
           value={hz}
           disabled={!enable}
           onChange={handleChangeHz}
@@ -107,12 +82,17 @@ function App() {
         className="apply-bt"
         onClick={(ev) => {
           ev.preventDefault();
-          fetch(`/update-pwm?pin=${1}`, {
+          fetch(`/update-pwm`, {
             method: "POST",
+            headers: {
+              // Accept: "application/json",
+              "Content-Type": "application/json",
+            },
             body: JSON.stringify({
+              pin: 3,
               enable,
               frequency: hz * 1e6,
-              duty: value,
+              duty,
             }),
           });
         }}
