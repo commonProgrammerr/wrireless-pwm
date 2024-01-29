@@ -11,7 +11,7 @@ function App() {
   useEffect(() => {
     fetch("/load").then(res => res.json()).then(data => {
       data.duty && setDuty(data.duty)
-      data.frequency && setHz(data.frequency)
+      data.frequency && setHz(data.frequency / 1000)
     })
   }, [])
 
