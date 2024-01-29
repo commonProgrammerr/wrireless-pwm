@@ -35,14 +35,16 @@ PWMController PWM = PWMController();
   delayMicroseconds(300)
 
 void handleBody(AsyncWebServerRequest *request, uint8_t *data, size_t len, size_t index, size_t total);
+void handleEnable(AsyncWebServerRequest *request);
+
+byte chanels[2] = {0, 0};
 
 AsyncWebServer server(80);
-
 pwm_config config = {
     .enable = false,
-    .pin = 1,
-    .frequency = 0,
-    .duty = 0,
+    .pin = 4,
+    .frequency = 1000,
+    .duty = 512,
 };
 
 void handleUpdate(AsyncWebServerRequest *request);
@@ -53,7 +55,7 @@ void setup()
   Serial.begin(115200);
   SPIFFS.begin();
 
-  WiFi.softAP("wireless-pwm");
+  WiFi.softAP("wireless-pwm", "pwm12345");
   while (!Serial && millis() <= 3e4)
     delay(100);
 
@@ -61,22 +63,68 @@ void setup()
   Serial.print("AP IP address: ");
   Serial.println(IP);
 
-  RGB_COLOR(RGB_GREEN);
+  RGB_COLOR(RGB_RED);
 
   server.serveStatic("/", SPIFFS, "/", NULL)
       .setDefaultFile("index.html");
+  server.on("/load", HTTP_ANY, [](AsyncWebServerRequest *request)
+            {
+    auto res = request->beginResponseStream("application/json");
+
+    JsonDocument body;
+
+     body["frequency"] = config.frequency;
+     body["pin"] = config.pin;
+     body["duty"] = config.duty;
+
+    serializeJson(body, *res); 
+    
+    request->send(res); });
+
   server.on("/update-pwm", HTTP_POST, handleUpdate)
       .onBody(handleBody);
 
+  server.on("/enable", HTTP_POST, handleEnable);
+
   server.begin();
 
-  analogWriteResolution(14);
+  pinMode(0, INPUT_PULLUP);
+
+  Serial.println("Getting last config");
+
+  File config_file = SPIFFS.open("/pwm_config");
+  if (!(config_file && config_file.read((byte *)&config, sizeof(pwm_config))))
+    Serial.println("Fail to open config file");
+
+  config.enable = false;
+
+  ledcSetup(0, config.frequency, 10);
+  ledcAttachPin(config.pin, 0);
+  chanels[0] = config.pin;
 }
 
 void loop()
 {
-  delay(100);
-  if (WiFi.softAPgetStationNum())
+  if (!digitalRead(0))
+  {
+    config.enable = !config.enable;
+
+    if (config.enable)
+      ledcWrite(0, config.duty);
+    else
+      ledcWrite(0, 0);
+
+    while (!digitalRead(0))
+      delay(100);
+
+    return;
+  }
+
+  if (config.enable)
+  {
+    RGB_COLOR(RGB_RED);
+  }
+  else if (WiFi.softAPgetStationNum())
   {
     RGB_COLOR(RGB_BLUE);
   }
@@ -86,18 +134,23 @@ void loop()
   }
 }
 
-JsonObject getParamsObj(AsyncWebServerRequest *request)
+void handleEnable(AsyncWebServerRequest *request)
 {
-  JsonObject params;
-  AsyncWebParameter *p;
-  int total = request->params();
-  for (int i = 0; i < total; i++)
+
+  Serial.print("New request on ");
+  Serial.println(request->url());
+
+  config.enable = !config.enable;
+
+  if (chanels[0])
   {
-    p = request->getParam(i);
-    params[p->name().c_str()] = p->value();
+    if (config.enable)
+      ledcWrite(0, config.duty);
+    else
+      ledcWrite(0, 0);
   }
 
-  return params;
+  request->send(200);
 }
 
 void handleUpdate(AsyncWebServerRequest *request)
@@ -121,19 +174,34 @@ void handleUpdate(AsyncWebServerRequest *request)
     return request->send(500);
   }
 
-  auto stream = request->beginResponseStream("application/json");
-
   JsonDocument body;
   deserializeJson(body, body_file);
 
-  config.enable = body["enable"];
+  serializeJson(body, Serial);
+  Serial.println();
+
   config.frequency = body["frequency"];
   config.pin = body["pin"];
-  config.duty = static_cast<int>(body["duty"].as<double>() * 8192);
+  config.duty = body["duty"];
 
-  PWM.setup(config);
-  PWM.apply(config);
-  PWM.save("/output.config", &config);
+  if (config.pin != chanels[0])
+  {
+    ledcSetup(0, config.frequency, 10);
+    ledcAttachPin(config.pin, 0);
+    chanels[0] = config.pin;
+  }
+  else
+    ledcChangeFrequency(0, config.frequency, 10);
+
+  if (config.enable)
+    ledcWrite(0, config.duty);
+  else
+    ledcWrite(0, 0);
+
+  File config_file = SPIFFS.open("/pwm_config", "w", true);
+  if (!(config_file && config_file.write((byte *)&config, sizeof(pwm_config))))
+    Serial.println("Fail to save config file");
+
   request->send(200);
 }
 

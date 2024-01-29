@@ -58,3 +58,15 @@ h5 {
   font-size: 1.125rem;
   font-weight: 600;
 }
+.toggle-bt {
+  text-align: center;
+  padding: 8px;
+  border-radius: 12px;
+
+  background-color: hsl(234, 60%, 64%);
+  color: white;
+
+  font-size: 1.125rem;
+  font-weight: 600;
+  align-self: flex-start;
+}

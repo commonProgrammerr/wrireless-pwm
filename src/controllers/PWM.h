@@ -30,31 +30,17 @@ struct PWMController : ConfigController<pwm_config>
     return config_file && config_file.write((byte *)data, sizeof(pwm_config)) == sizeof(pwm_config);
   }
 
-  virtual void apply(pwm_config data)
+  void apply(pwm_config data)
   {
+    // pwm_config last_config;
 
-    analogWriteResolution(13U);
-    analogWriteFrequency(data.frequency);
-    analogWrite(data.pin, data.duty);
-    // int8_t channel = analogGetChannel(data.pin);
-
-    // log_v("GPIO %d - Using Channel %d, Value = %d", data.pin, channel, data.duty);
-    // if (ledcSetup(channel, data.frequency, 14U) == 0)
-    // {
-    //   log_e("analogWrite setup failed (freq = %u, resolution = %u). Try setting different resolution or frequency");
-    //   return;
-    // }
-    // ledcAttachPin(data.pin, channel);
-
-    // if (data.enable)
-    //   ledcWrite(channel, data.duty);
-    // else
-    //   ledcWrite(channel, 0U);
-  }
+    // this->load()
+    }
 
   void setup(pwm_config data)
   {
-    pinMode(data.pin, OUTPUT);
+    ledcSetup(0, data.frequency, 10);
+    ledcAttachPin(4, 0);
   }
 };
 
